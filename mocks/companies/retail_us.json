@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Apex Outdoor Gear",
+    "website": "https://apexoutdoorgear.com",
+    "industry": "Retail - Outdoor & Sporting Goods",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/apex-outdoor-gear",
+    "description": "Apex Outdoor Gear is a leading retail chain specializing in premium camping, hiking, and mountaineering equipment, with 12 stores across the Pacific Northwest and an active e-commerce presence.",
+    "employee_estimate": 120,
+    "source": "mock"
+  },
+  {
+    "name": "Bella Cosmetic Boutiques",
+    "website": "https://bellacosmetics.com",
+    "industry": "Retail - Cosmetics & Beauty",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/bella-cosmetics",
+    "description": "A luxury beauty boutique chain with 45 retail locations across California and Texas. Bella specializes in organic, vegan, and premium skincare products for modern consumers.",
+    "employee_estimate": 350,
+    "source": "mock"
+  },
+  {
+    "name": "GreenLife Grocery Market",
+    "website": "https://greenlifegrocery.com",
+    "industry": "Retail - Food & Beverage",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/greenlife-grocery",
+    "description": "GreenLife is a regional organic grocery chain with 18 locations in the Midwest. We focus on farm-to-table fresh produce, organic bulk goods, and eco-friendly home items.",
+    "employee_estimate": 450,
+    "source": "mock"
+  },
+  {
+    "name": "Nova Tech Retailers",
+    "website": "https://novatechstores.com",
+    "industry": "Retail - Consumer Electronics",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/nova-tech",
+    "description": "Specialty electronics stores in major metropolitan areas, offering premium smart home devices, boutique audio equipment, and custom gaming PCs.",
+    "employee_estimate": 85,
+    "source": "mock"
+  }
+]

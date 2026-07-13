@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Midwest Food & Beverage Distributors",
+    "website": "https://midwestfbd.com",
+    "industry": "Distribution - Food & Beverage",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/midwest-fbd",
+    "description": "Midwest FBD is a primary B2B distributor of specialty beverages, craft beers, and gourmet food products to independent retailers and supermarkets across 8 Midwestern states.",
+    "employee_estimate": 280,
+    "source": "mock"
+  },
+  {
+    "name": "Summit Hardware Supply",
+    "website": "https://summithubsupply.com",
+    "industry": "Wholesale - Industrial & Hardware",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/summit-hardware",
+    "description": "Summit Hardware Supply is a large-scale distributor of tools, safety gear, and industrial equipment supplying hardware stores, construction sites, and manufacturing plants nationwide.",
+    "employee_estimate": 620,
+    "source": "mock"
+  },
+  {
+    "name": "Vanguard Apparel Importers",
+    "website": "https://vanguardapparel.com",
+    "industry": "Distribution - Apparel & Fashion",
+    "country": "US",
+    "linkedin_url": "https://linkedin.com/company/vanguard-apparel",
+    "description": "B2B importer and master distributor of sustainable activewear and athleisure garments, serving boutique retail brands and department stores in North America.",
+    "employee_estimate": 95,
+    "source": "mock"
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "London Wellness Co.",
+    "website": "https://londonwellness.co.uk",
+    "industry": "Retail - Cosmetics & Beauty",
+    "country": "UK",
+    "linkedin_url": "https://linkedin.com/company/london-wellness",
+    "description": "London Wellness Co. is a boutique lifestyle brand and retailer offering organic skincare, health supplements, and yoga apparel with 5 locations in London and a thriving online shop.",
+    "employee_estimate": 45,
+    "source": "mock"
+  },
+  {
+    "name": "Albion Home & Garden",
+    "website": "https://albionhome.co.uk",
+    "industry": "Retail - Home Decor & Garden",
+    "country": "UK",
+    "linkedin_url": "https://linkedin.com/company/albion-home",
+    "description": "Albion Home & Garden operates large garden centers and home furnishings depots across the United Kingdom, focusing on sustainable outdoor furniture, indoor plants, and artisan homeware.",
+    "employee_estimate": 190,
+    "source": "mock"
+  }
+]

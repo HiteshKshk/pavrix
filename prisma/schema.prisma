@@ -1,0 +1,141 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Category {
+  id             String    @id @default(uuid()) @map("id")
+  name           String    @unique @map("name")
+  weightTemplate Json      @map("weight_template") // e.g. { categoryFit: 0.2, geography: 0.1, ... }
+  brandKeywords  Json      @map("brand_keywords")  // array of competitor keywords
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
+model IcpSearch {
+  id              String          @id @default(uuid()) @map("id")
+  rawInput        Json            @map("raw_input")        // IcpRawInput
+  expandedProfile Json            @map("expanded_profile") // IcpExpandedProfile
+  searchVariants  Json            @map("search_variants")  // string[]
+  totalFound      Int             @default(0) @map("total_found")
+  qualifiedCount  Int             @default(0) @map("qualified_count")
+  status          String          @default("pending") @map("status") // pending | running | complete | error
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  results         CompanySearch[]
+
+  @@map("icp_searches")
+}
+
+model Company {
+  id                 String                      @id @default(uuid()) @map("id")
+  name               String                      @map("name")
+  address            String                      @map("address")
+  country            String?                     @map("country")
+  categoryTags       String[]                    @map("category_tags")
+  website            String?                     @map("website")
+  phone              String?                     @map("phone")
+  source             String                      @map("source") // inbound | outbound
+  status             String                      @default("New") @map("status") // New | Qualified | Contacted | Meeting | Won | Lost | Archive
+  discoveryDate      DateTime                    @default(now()) @map("discovery_date")
+  revenueBand        String?                     @map("revenue_band")
+  employeeCountBand  String?                     @map("employee_count_band")
+  storeCount         Int?                        @map("store_count")
+  hasEcommerce       Boolean                     @default(false) @map("has_ecommerce")
+  description        String?                     @map("description") @db.Text
+  aiExplanation      String?                     @map("ai_explanation") @db.Text
+  decisionMakerTitle String?                     @map("decision_maker_title")
+  crawlData          Json?                       @map("crawl_data")   // structured CrawlResult
+  crawledAt          DateTime?                   @map("crawled_at")
+  notes              String?                     @map("notes") @db.Text
+  embedding          Unsupported("vector(1536)")? @map("embedding")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @updatedAt @map("updated_at")
+  signals            Signal[]
+  scores             Score[]
+  outreach           Outreach[]
+  searchResults      CompanySearch[]
+
+  @@map("companies")
+}
+
+model CompanySearch {
+  id          String    @id @default(uuid()) @map("id")
+  searchId    String    @map("search_id")
+  search      IcpSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  companyId   String    @map("company_id")
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  rank        Int       @map("rank")
+  qualified   Boolean   @default(false) @map("qualified")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([searchId, companyId])
+  @@map("company_searches")
+}
+
+model Signal {
+  id           String   @id @default(uuid()) @map("id")
+  companyId    String   @map("company_id")
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type         String   @map("type") // expansion | hiring | new_ecommerce | competitor_brand_sold | funding | trade_show | store_locator_present | wholesale_page | premium_segment | import_business | multiple_locations
+  detectedDate DateTime @map("detected_date")
+  sourceUrl    String?  @map("source_url")
+  pointValue   Float    @map("point_value")
+  description  String?  @map("description")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("signals")
+}
+
+model Score {
+  id           String   @id @default(uuid()) @map("id")
+  companyId    String   @map("company_id")
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryName String   @map("category_name")
+  totalScore   Float    @map("total_score")
+  breakdown    Json     @map("breakdown")
+  scoreVersion String   @map("score_version")
+  computedAt   DateTime @default(now()) @map("computed_at")
+
+  @@map("scores")
+}
+
+model Outreach {
+  id                String   @id @default(uuid()) @map("id")
+  companyId         String   @map("company_id")
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailSubject      String?  @map("email_subject")
+  draftText         String   @map("draft_text") @db.Text
+  linkedinDraft     String?  @map("linkedin_draft") @db.Text
+  followupDraft     String?  @map("followup_draft") @db.Text
+  status            String   @map("status") // drafted | approved | sent
+  signalsReferenced Json     @map("signals_referenced")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("outreach")
+}
+
+model LeadInbound {
+  id                String   @id @default(uuid()) @map("id")
+  name              String   @map("name")
+  website           String?  @map("website")
+  phone             String?  @map("phone")
+  address           String?  @map("address")
+  categoryName      String?  @map("category_name")
+  revenueBand       String?  @map("revenue_band")
+  employeeCountBand String?  @map("employee_count_band")
+  storeCount        Int?     @map("store_count")
+  hasEcommerce      Boolean  @default(false) @map("has_ecommerce")
+  contactEmail      String?  @map("contact_email")
+  message           String?  @map("message")
+  submittedAt       DateTime @default(now()) @map("submitted_at")
+  processed         Boolean  @default(false) @map("processed")
+
+  @@map("leads_inbound")
+}
