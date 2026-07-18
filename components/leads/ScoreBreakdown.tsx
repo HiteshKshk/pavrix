@@ -26,6 +26,7 @@ const FACTOR_LABELS: Record<string, string> = {
   employeeCount: "Employee Count",
   ecommerce: "E-Commerce",
   dataQuality: "Data Quality",
+  aiConfidence: "AI Confidence",
 };
 
 const FACTOR_DESCRIPTIONS: Record<string, string> = {
@@ -36,12 +37,14 @@ const FACTOR_DESCRIPTIONS: Record<string, string> = {
   storeCount: "Physical store footprint — more locations = higher buying volume",
   buyingSignals: "Recency-weighted signals detected (expansion, hiring, wholesale page, etc.)",
   websiteQuality: "Website completeness — contact page, wholesale page, store finder",
+  aiConfidence: "AI confidence score evaluated from scraped profiles and ICP settings",
 };
 
 export function ScoreBreakdown({ breakdown, totalScore }: ScoreBreakdownProps) {
-  const factors = Object.entries(breakdown).sort(
-    ([, a], [, b]) => b.contribution - a.contribution
-  );
+  const allowedKeys = ["categoryFit", "brandMatch", "buyingSignals", "websiteQuality", "storeCount", "aiConfidence"];
+  const factors = Object.entries(breakdown)
+    .filter(([key]) => allowedKeys.includes(key))
+    .sort(([, a], [, b]) => b.contribution - a.contribution);
 
   const getBandColor = (score: number): "hot" | "warm" | "nurture" | "primary" => {
     if (score >= 80) return "hot";

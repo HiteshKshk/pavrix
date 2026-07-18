@@ -69,13 +69,12 @@ function runTests() {
     "sportswear",
     brandKeywords,
     {
-      categoryFit: 0.20,
-      geography: 0.10,
-      brandMatch: 0.15,
-      competitorPresence: 0.15,
-      storeCount: 0.10,
-      buyingSignals: 0.10,
-      websiteQuality: 0.05,
+      industryMatch: 0.20,
+      productMatch: 0.30,
+      buyingSignals: 0.20,
+      websiteCompleteness: 0.10,
+      companyInfoCompleteness: 0.10,
+      aiConfidence: 0.10,
     },
     siteContent
   );
@@ -83,9 +82,8 @@ function runTests() {
   console.log(`Computed Score: ${scoreRes.totalScore} (${scoreRes.band})`);
   assert(scoreRes.totalScore >= 75 && scoreRes.totalScore <= 85, "Total score fits expected range for warm/hot lead");
   assert(scoreRes.breakdown.categoryFit.raw === 100, "Category Fit is 100%");
-  assert(scoreRes.breakdown.geography.raw === 100, "Geography in UK is 100%");
-  assert(scoreRes.breakdown.competitorPresence.raw === 100, "Adjacent brand presence matched 3 keywords (100% raw score)");
-  assert(scoreRes.breakdown.buyingSignals.raw === 50, "Signals raw score sum decayed: 30 + 20 = 50 pts");
+  assert(scoreRes.breakdown.storeCount.raw === 100, "Store footprint raw score matched (100%)");
+  assert(scoreRes.breakdown.buyingSignals.raw === 50, "Signals raw score sum: 30 + 20 = 50 pts");
 
   console.log("\n=========================================");
   console.log(`TEST RUN COMPLETE: ${passed} Passed, ${failed} Failed`);

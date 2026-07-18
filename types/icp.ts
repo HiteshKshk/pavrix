@@ -14,6 +14,10 @@ export interface IcpExpandedProfile {
   targetCompanies: string[];
   exclude: string[];
   reasoning: string;
+  expandedBuyerProfile?: string;
+  searchKeywords?: string[];
+  industryKeywords?: string[];
+  alternativePhrases?: string[];
 }
 
 export interface IcpProfileDetails {

@@ -1,16 +1,16 @@
 import { prisma } from "../db/prisma";
 import { checkDbConnection } from "../db/connection";
-import { MemoryStore } from "../db/memory-store";
+import { SerpApiProvider } from "../discovery/serpapi.provider";
 
 export class DashboardService {
   /**
    * Generates sales metrics and distribution data for the dashboard.
    */
   static async getMetrics() {
-    let isDbLive = await checkDbConnection();
+    const isDbLive = await checkDbConnection();
     let companies: any[] = [];
     let inboundLeadsRaw: any[] = [];
-    let dbWarning: string | undefined = undefined;
+    const dbWarning: string | undefined = undefined;
 
     if (isDbLive) {
       try {
@@ -23,23 +23,19 @@ export class DashboardService {
         });
         inboundLeadsRaw = await prisma.leadInbound.findMany();
       } catch (error) {
-        console.warn("[DashboardService] Live DB query failed, falling back to memory:", error);
-        isDbLive = false;
+        console.warn("[DashboardService] Live DB query failed:", error);
       }
     }
 
-    if (!isDbLive || companies.length === 0) {
-      companies = MemoryStore.getCompanies().map(c => {
-        const scores = MemoryStore.getScores(c.id);
-        const signals = MemoryStore.getSignals(c.id);
-        return {
-          ...c,
-          scores,
-          signals,
-        };
-      });
+    // Only fall back to memory store when DB is completely offline
+    if (!isDbLive) {
+      const { MemoryStore } = await import("../db/memory-store");
+      companies = MemoryStore.getCompanies().map((c: any) => ({
+        ...c,
+        scores: MemoryStore.getScores(c.id),
+        signals: MemoryStore.getSignals(c.id),
+      }));
       inboundLeadsRaw = MemoryStore.getLeadsInbound();
-      dbWarning = "Running in Simulated Data Mode (in-memory)";
     }
 
     // Process aggregations in JavaScript (robust, unified for both DB and memory mode)
@@ -47,6 +43,7 @@ export class DashboardService {
     let qualifiedCount = 0;
     let inboundCount = 0;
     let outboundCount = 0;
+    const countriesSet = new Set<string>();
 
     const categoryCounts: Record<string, number> = {};
 
@@ -74,8 +71,17 @@ export class DashboardService {
         outboundCount++;
       }
 
+      // Track unique countries
+      const countryStr: string = c.country || c.address || "";
+      if (countryStr) {
+        // Extract country-like segment (last part after last comma, or whole string if short)
+        const parts = countryStr.split(",").map((p: string) => p.trim()).filter(Boolean);
+        const country = parts[parts.length - 1] || countryStr;
+        if (country.length <= 50) countriesSet.add(country);
+      }
+
       // Category distributions
-      c.categoryTags.forEach((cat: string) => {
+      (c.categoryTags as string[]).forEach((cat: string) => {
         categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
       });
 
@@ -107,6 +113,15 @@ export class DashboardService {
       count,
     })).sort((a, b) => b.count - a.count);
 
+    // Retrieve SerpAPI monthly usage metrics
+    let serpApiUsage = 0;
+    let serpApiLimit = 250;
+    try {
+      const serpApi = new SerpApiProvider();
+      serpApiUsage = await serpApi.getMonthlyUsageCount();
+      serpApiLimit = serpApi.getMaxQuota();
+    } catch {}
+
     return {
       stats: {
         totalDiscovered,
@@ -114,9 +129,12 @@ export class DashboardService {
         inboundCount,
         outboundCount,
         categoriesCount: categoryDistribution.length,
+        countriesCount: countriesSet.size,
+        serpApiUsage,
+        serpApiLimit,
       },
       categoryDistribution,
-      recentLeads: formattedLeads.slice(0, 5),
+      recentLeads: formattedLeads.slice(0, 10),
       allLeads: formattedLeads,
       inboundFormCount: inboundLeadsRaw.length,
       dbWarning,

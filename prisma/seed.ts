@@ -1,9 +1,8 @@
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { prisma } from "../lib/db/prisma";
 import { SEED_CATEGORIES, generateMockCompanies, generateMockSignals } from "../lib/db/mock-data";
 import { ScoringEngine } from "../lib/scoring.engine";
 import { AIService } from "../lib/services/ai.service";
-
-const prisma = new PrismaClient();
 
 async function main() {
   console.log("[Seed] Enabling pgvector extension...");

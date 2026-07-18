@@ -12,6 +12,28 @@ import { StatusSelect } from "@/components/ui/StatusSelect";
 import { ScoreBreakdown } from "@/components/leads/ScoreBreakdown";
 import { OutreachPanel } from "@/components/leads/OutreachPanel";
 
+const Instagram = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+  </svg>
+);
+
+const Facebook = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+  </svg>
+);
+
+const LinkedIn = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+    <rect x="2" y="9" width="4" height="12"></rect>
+    <circle cx="4" cy="4" r="2"></circle>
+  </svg>
+);
+
 type DetailTab = "overview" | "score" | "signals" | "outreach" | "notes";
 
 export default function LeadDetailPage() {
@@ -245,11 +267,76 @@ export default function LeadDetailPage() {
 
                 {lead.crawlData.emails?.length > 0 && (
                   <div>
-                    <div className="text-[11px] text-muted-foreground mb-1">Contact Emails</div>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="text-[11px] text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Contact Emails</div>
+                    <div className="flex flex-wrap gap-2">
                       {lead.crawlData.emails.slice(0, 4).map((e: string) => (
                         <a key={e} href={`mailto:${e}`} className="text-xs text-primary hover:underline">{e}</a>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Social Links */}
+                {lead.crawlData.socialLinks && Object.keys(lead.crawlData.socialLinks).length > 0 && (
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider font-semibold">Social Profiles</div>
+                    <div className="flex flex-wrap gap-4">
+                      {Object.entries(lead.crawlData.socialLinks).map(([platform, url]) => {
+                        if (!url) return null;
+                        return (
+                          <a
+                            key={platform}
+                            href={url as string}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            {platform === "instagram" && <Instagram className="h-3.5 w-3.5" />}
+                            {platform === "facebook" && <Facebook className="h-3.5 w-3.5" />}
+                            {platform === "linkedin" && <LinkedIn className="h-3.5 w-3.5" />}
+                            <span className="capitalize">{platform}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Product Categories */}
+                {lead.crawlData.productCategories && lead.crawlData.productCategories.length > 0 && (
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider font-semibold">Product Categories Scraped</div>
+                    <div className="flex flex-wrap gap-1">
+                      {lead.crawlData.productCategories.map((cat: string) => (
+                        <span key={cat} className="px-2 py-0.5 rounded-full bg-secondary/80 text-xs text-foreground border border-border">
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Scraped Locations */}
+                {lead.crawlData.locations && lead.crawlData.locations.length > 0 && (
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider font-semibold">Addresses Found On Site</div>
+                    <ul className="space-y-1.5 text-xs text-muted-foreground">
+                      {lead.crawlData.locations.map((loc: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-1">
+                          <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-primary" />
+                          <span>{loc}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Scraped About Text */}
+                {lead.crawlData.aboutText && (
+                  <div>
+                    <div className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider font-semibold">Scraped Website Text</div>
+                    <div className="text-xs text-muted-foreground leading-relaxed p-3.5 rounded-xl border border-border bg-secondary/30 max-h-40 overflow-y-auto scrollbar-none">
+                      {lead.crawlData.aboutText}
                     </div>
                   </div>
                 )}

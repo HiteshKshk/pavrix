@@ -39,6 +39,7 @@ model Company {
   country            String?                     @map("country")
   categoryTags       String[]                    @map("category_tags")
   website            String?                     @map("website")
+  rootDomain         String?                     @unique @map("root_domain")
   phone              String?                     @map("phone")
   source             String                      @map("source") // inbound | outbound
   status             String                      @default("New") @map("status") // New | Qualified | Contacted | Meeting | Won | Lost | Archive
@@ -60,6 +61,7 @@ model Company {
   scores             Score[]
   outreach           Outreach[]
   searchResults      CompanySearch[]
+  websiteContents    WebsiteContent[]
 
   @@map("companies")
 }
@@ -87,6 +89,8 @@ model Signal {
   sourceUrl    String?  @map("source_url")
   pointValue   Float    @map("point_value")
   description  String?  @map("description")
+  sourceField  String?  @map("source_field")
+  matchedText  String?  @map("matched_text")
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("signals")
@@ -138,4 +142,53 @@ model LeadInbound {
   processed         Boolean  @default(false) @map("processed")
 
   @@map("leads_inbound")
+}
+
+model WebsiteContent {
+  id        String   @id @default(uuid()) @map("id")
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  url       String   @map("url")
+  content   String   @map("content") @db.Text
+  crawledAt DateTime @default(now()) @map("crawled_at")
+
+  @@map("website_content")
+}
+
+model SearchKeyword {
+  id        String   @id @default(uuid()) @map("id")
+  keyword   String   @unique @map("keyword")
+  results   Json     @map("results") // DiscoveredCompany[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("search_keywords")
+}
+
+model SerpApiUsage {
+  id        String   @id @default(uuid()) @map("id")
+  keyword   String   @map("keyword")
+  results   Int      @map("results")
+  timestamp DateTime @default(now()) @map("timestamp")
+
+  @@map("serp_api_usage")
+}
+
+model User {
+  id        String   @id @default(uuid()) @map("id")
+  email     String   @unique @map("email")
+  name      String?  @map("name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @map("id")
+  name      String   @map("name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("organizations")
 }

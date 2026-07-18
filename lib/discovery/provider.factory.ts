@@ -1,11 +1,10 @@
 import { DiscoveryProvider } from "./provider.interface";
 import { MockDiscoveryProvider } from "./mock.provider";
-import { BraveSearchProvider } from "./brave.provider";
-import { GooglePlacesProvider } from "./google-places.provider";
+import { SerpApiProvider } from "./serpapi.provider";
 
 /**
  * DiscoveryProviderFactory — returns the active discovery provider.
- * Reads DISCOVERY_PROVIDER env var: "brave" | "google" | "mock" (default: "mock")
+ * Reads DISCOVERY_PROVIDER env var: "serpapi" | "mock" (default: "mock")
  */
 export class DiscoveryProviderFactory {
   static getProvider(providerType?: string): DiscoveryProvider {
@@ -14,10 +13,9 @@ export class DiscoveryProviderFactory {
     ).toLowerCase();
 
     switch (type) {
-      case "brave":
-        return new BraveSearchProvider();
       case "google":
-        return new GooglePlacesProvider();
+      case "serpapi":
+        return new SerpApiProvider();
       case "mock":
       default:
         return new MockDiscoveryProvider();

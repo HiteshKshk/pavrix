@@ -9,7 +9,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
  */
 export class GeminiProvider implements AIProvider {
   private genai: GoogleGenAI | null = null;
-  private readonly model = "gemini-2.5-flash";
+  private readonly model = "gemini-2.0-flash";
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;

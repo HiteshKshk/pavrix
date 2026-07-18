@@ -19,6 +19,8 @@ interface DashboardData {
     categoriesCount: number;
     avgScore?: number;
     countriesCount?: number;
+    serpApiUsage: number;
+    serpApiLimit: number;
   };
   categoryDistribution: Array<{ name: string; count: number }>;
   recentLeads: any[];
@@ -198,6 +200,43 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* SerpAPI Quota indicator */}
+      {metrics?.stats && (
+        <div className="rounded-xl border border-border bg-card/30 backdrop-blur-sm p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 animate-fade-in">
+          <div className="space-y-1 shrink-0">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" />
+              SerpAPI Search Quota Usage
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Remaining: <span className="font-semibold text-foreground">{Math.max(0, metrics.stats.serpApiLimit - metrics.stats.serpApiUsage)}</span> searches of {metrics.stats.serpApiLimit} this month.
+            </p>
+          </div>
+          <div className="flex-1 max-w-md w-full space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="text-muted-foreground">
+                {Math.round((metrics.stats.serpApiUsage / metrics.stats.serpApiLimit) * 100)}% Used
+              </span>
+              <span className="text-foreground">
+                {metrics.stats.serpApiUsage} / {metrics.stats.serpApiLimit} searches
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+              <div
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  metrics.stats.serpApiUsage >= metrics.stats.serpApiLimit * 0.9
+                    ? "bg-rose-500"
+                    : metrics.stats.serpApiUsage >= metrics.stats.serpApiLimit * 0.75
+                    ? "bg-amber-500"
+                    : "bg-primary"
+                }`}
+                style={{ width: `${Math.min(100, (metrics.stats.serpApiUsage / metrics.stats.serpApiLimit) * 100)}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

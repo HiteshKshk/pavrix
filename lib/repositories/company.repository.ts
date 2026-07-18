@@ -54,11 +54,33 @@ export interface UpdateCompanyData {
  * Business logic lives in services; repositories handle only data access.
  */
 export class CompanyRepository {
+  static extractDomain(url?: string | null): string {
+    if (!url) return "";
+    try {
+      const clean = url.trim().toLowerCase();
+      const withHttp = clean.startsWith("http") ? clean : `https://${clean}`;
+      return new URL(withHttp).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  }
+
   static async create(data: CreateCompanyData): Promise<any> {
     const isDbLive = await checkDbConnection();
+    const rootDomain = data.website ? CompanyRepository.extractDomain(data.website) : null;
 
     if (isDbLive) {
       try {
+        if (rootDomain) {
+          const existing = await prisma.company.findUnique({
+            where: { rootDomain }
+          });
+          if (existing) {
+            console.info(`[CompanyRepository] Company with root domain "${rootDomain}" already exists. Mapped to ID: ${existing.id}`);
+            return existing;
+          }
+        }
+
         return await prisma.company.create({
           data: {
             name: data.name,
@@ -66,6 +88,7 @@ export class CompanyRepository {
             country: data.country,
             categoryTags: data.categoryTags,
             website: data.website,
+            rootDomain,
             phone: data.phone,
             source: data.source as any,
             storeCount: data.storeCount,
@@ -82,6 +105,16 @@ export class CompanyRepository {
         });
       } catch (err) {
         console.warn("[CompanyRepository] DB create failed, falling back to memory:", err);
+      }
+    }
+
+    if (rootDomain) {
+      const existingInMemory = MemoryStore.getCompanies().find(
+        (c) => c.website && CompanyRepository.extractDomain(c.website) === rootDomain
+      );
+      if (existingInMemory) {
+        console.info(`[CompanyRepository] In-memory company with root domain "${rootDomain}" already exists.`);
+        return existingInMemory;
       }
     }
 

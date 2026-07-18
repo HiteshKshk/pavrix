@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "setup": "npm install && npx prisma generate && npx prisma db push && npx prisma db seed"
@@ -20,6 +20,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "framer-motion": "^12.42.2",
+    "inngest": "^4.12.1",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "openai": "^6.46.0",

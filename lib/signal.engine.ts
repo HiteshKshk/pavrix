@@ -17,6 +17,8 @@ export interface DetectedSignal {
   type: SignalType;
   pointValue: number;
   description: string;
+  matchedText?: string;
+  sourceField?: string;
 }
 
 export class SignalEngine {
@@ -42,6 +44,8 @@ export class SignalEngine {
           type: "wholesale_page",
           pointValue: 25,
           description: "Company has a dedicated wholesale or trade account page.",
+          sourceField: "Playwright HTML crawl results",
+          matchedText: "wholesale page path detected",
         });
       }
 
@@ -54,6 +58,8 @@ export class SignalEngine {
           type: "store_locator_present",
           pointValue: 20,
           description: `Store locator present — ${storeLabel}.`,
+          sourceField: "Playwright HTML crawl results",
+          matchedText: storeLabel,
         });
       }
 
@@ -63,6 +69,8 @@ export class SignalEngine {
           type: "multiple_locations",
           pointValue: Math.min(30, crawlResult.storeCount * 3),
           description: `Multiple physical locations detected: ${crawlResult.storeCount} stores.`,
+          sourceField: "Playwright store count analysis",
+          matchedText: `${crawlResult.storeCount} stores count`,
         });
       }
 
@@ -72,6 +80,8 @@ export class SignalEngine {
           type: "competitor_brand_sold",
           pointValue: 25,
           description: `Competing brands sold: ${crawlResult.brandMentions.slice(0, 5).join(", ")}`,
+          sourceField: "Playwright brand matcher",
+          matchedText: crawlResult.brandMentions.slice(0, 5).join(", "),
         });
       }
     }
@@ -105,6 +115,8 @@ export class SignalEngine {
         description: matchSentence
           ? `Store expansion signal: "${matchSentence}"`
           : "Announced new location or warehouse expansion.",
+        sourceField: "scraped website text",
+        matchedText: matchSentence ?? "expansion match",
       });
     }
 
@@ -133,6 +145,8 @@ export class SignalEngine {
         description: matchSentence
           ? `Buyer hiring signal: "${matchSentence}"`
           : "Hiring postings for buyers or purchasing managers detected.",
+        sourceField: "scraped website careers text",
+        matchedText: matchSentence ?? "hiring match",
       });
     }
 
@@ -151,6 +165,8 @@ export class SignalEngine {
           type: "competitor_brand_sold",
           pointValue: 25,
           description: `Competing brands sold: ${matchedBrands.join(", ")}`,
+          sourceField: "fallback scraped text search",
+          matchedText: matchedBrands.join(", "),
         });
       }
     }
@@ -171,6 +187,8 @@ export class SignalEngine {
         type: "new_ecommerce",
         pointValue: 20,
         description: "Active e-commerce or online ordering capability detected.",
+        sourceField: "scraped website body text",
+        matchedText: "ecommerce keyword match",
       });
     }
 
@@ -191,6 +209,8 @@ export class SignalEngine {
         type: "trade_show",
         pointValue: 15,
         description: "Trade show or exhibition attendance mentioned.",
+        sourceField: "scraped website news/text",
+        matchedText: "trade show match",
       });
     }
 
@@ -209,6 +229,8 @@ export class SignalEngine {
         type: "premium_segment",
         pointValue: 15,
         description: "Premium or luxury market positioning detected.",
+        sourceField: "scraped website marketing text",
+        matchedText: "luxury match",
       });
     }
 
@@ -226,6 +248,8 @@ export class SignalEngine {
         type: "import_business",
         pointValue: 10,
         description: "Import or international brand sourcing activity detected.",
+        sourceField: "scraped website sourcing text",
+        matchedText: "import match",
       });
     }
 

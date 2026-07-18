@@ -1,6 +1,4 @@
-import { DiscoveryProvider, DiscoveredCompanyInput } from "./provider.interface";
-import { IcpRawInput } from "../../types/icp";
-import { IcpExpansionResult } from "../services/ai.service";
+import { DiscoveryProvider, DiscoveredCompany } from "./provider.interface";
 
 /**
  * BraveSearchProvider — discovers companies using the Brave Search API.
@@ -21,27 +19,20 @@ export class BraveSearchProvider implements DiscoveryProvider {
     }
   }
 
-  async search(
-    rawInput: IcpRawInput,
-    expandedProfile: IcpExpansionResult
-  ): Promise<DiscoveredCompanyInput[]> {
+  async search(keywords: string[]): Promise<DiscoveredCompany[]> {
     if (!this.apiKey) {
-      return this.mockSearch(rawInput, expandedProfile);
+      return this.mockSearch(keywords);
     }
 
-    const results: DiscoveredCompanyInput[] = [];
+    const results: DiscoveredCompany[] = [];
     const seen = new Set<string>();
-
-    // Build search queries from the expanded ICP variants
-    const queries = expandedProfile.searchVariants.slice(0, 5);
+    const queries = keywords.slice(0, 5);
 
     for (const query of queries) {
       try {
-        const searchQuery = `${query} ${rawInput.country}`;
         const url = new URL(this.baseUrl);
-        url.searchParams.set("q", searchQuery);
+        url.searchParams.set("q", query);
         url.searchParams.set("count", "10");
-        url.searchParams.set("country", this.countryCodeMap(rawInput.country));
         url.searchParams.set("search_lang", "en");
         url.searchParams.set("text_decorations", "false");
 
@@ -54,7 +45,7 @@ export class BraveSearchProvider implements DiscoveryProvider {
         });
 
         if (!response.ok) {
-          console.warn(`[BraveSearchProvider] Query "${searchQuery}" returned ${response.status}`);
+          console.warn(`[BraveSearchProvider] Query "${query}" returned ${response.status}`);
           continue;
         }
 
@@ -69,11 +60,8 @@ export class BraveSearchProvider implements DiscoveryProvider {
           results.push({
             name: result.title ?? domain,
             website: result.url,
-            description: result.description ?? "",
+            title: result.title ?? domain,
             snippet: result.description ?? "",
-            country: rawInput.country,
-            source: "brave_search",
-            rawPayload: result,
           });
         }
       } catch (err) {
@@ -94,29 +82,7 @@ export class BraveSearchProvider implements DiscoveryProvider {
     }
   }
 
-  private countryCodeMap(country: string): string {
-    const map: Record<string, string> = {
-      "United States": "us",
-      "United Kingdom": "gb",
-      Canada: "ca",
-      Australia: "au",
-      Germany: "de",
-      France: "fr",
-      India: "in",
-    };
-    const lower = country.toLowerCase();
-    for (const [name, code] of Object.entries(map)) {
-      if (lower.includes(name.toLowerCase()) || lower.includes(code)) {
-        return code;
-      }
-    }
-    return "us";
-  }
-
-  private mockSearch(
-    rawInput: IcpRawInput,
-    expandedProfile: IcpExpansionResult
-  ): DiscoveredCompanyInput[] {
+  private mockSearch(keywords: string[]): DiscoveredCompany[] {
     const brands = [
       { name: "Atlas", suffix: "Sports" },
       { name: "Century", suffix: "Retail" },
@@ -124,20 +90,27 @@ export class BraveSearchProvider implements DiscoveryProvider {
       { name: "Vanguard", suffix: "Outpost" },
       { name: "Cascade", suffix: "Trading" },
       { name: "Summit", suffix: "Boutique" },
+      { name: "Apex", suffix: "Outdoors" },
+      { name: "Summit Peak", suffix: "Outfitters" },
+      { name: "Velo & Trail", suffix: "Collective" },
+      { name: "Latitude", suffix: "Lifestyle" },
+      { name: "Solstice", suffix: "Active" },
+      { name: "Pinnacle", suffix: "Exchange" },
     ];
 
-    return brands.map((b, i) => {
-      const compName = `${b.name} ${rawInput.industry} ${b.suffix}`;
-      const domain = compName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
+    const keywordText = keywords[0] ?? "sportswear";
+    const randomSuffix = Math.floor(Math.random() * 900) + 100;
+
+    return brands.map((b) => {
+      const compName = `${b.name} ${b.suffix} ${randomSuffix}`;
+      const domain = `${b.name.toLowerCase().replace(/[^a-z0-9]/g, "")}${b.suffix.toLowerCase().replace(/[^a-z0-9]/g, "")}${randomSuffix}.com`;
       return {
         name: compName,
         website: `https://${domain}`,
-        description: `${compName} is a ${expandedProfile.targetCompanies[0] ?? "retail"} based in ${rawInput.country}, specializing in ${rawInput.productDescription}.`,
-        snippet: `Premium ${rawInput.industry} retailer in ${rawInput.country}. Carrying top brands and serving wholesale buyers.`,
-        country: rawInput.country,
-        source: "brave_mock",
-        rawPayload: { mock: true, index: i },
+        title: compName,
+        snippet: `Premium retailer matching query: ${keywordText}. Carrying top brands and serving wholesale buyers.`,
       };
     });
   }
 }
+

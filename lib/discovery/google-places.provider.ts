@@ -1,6 +1,4 @@
-import { DiscoveryProvider, DiscoveredCompanyInput } from "./provider.interface";
-import { IcpRawInput } from "../../types/icp";
-import { IcpExpansionResult } from "../services/ai.service";
+import { DiscoveryProvider, DiscoveredCompany } from "./provider.interface";
 
 /**
  * GooglePlacesProvider — discovers companies using the Google Places Text Search API.
@@ -19,29 +17,23 @@ export class GooglePlacesProvider implements DiscoveryProvider {
     }
   }
 
-  async search(
-    rawInput: IcpRawInput,
-    expandedProfile: IcpExpansionResult
-  ): Promise<DiscoveredCompanyInput[]> {
+  async search(keywords: string[]): Promise<DiscoveredCompany[]> {
     if (!this.apiKey) {
-      return this.mockSearch(rawInput, expandedProfile);
+      return this.mockSearch(keywords);
     }
 
-    const results: DiscoveredCompanyInput[] = [];
+    const results: DiscoveredCompany[] = [];
     const seen = new Set<string>();
-
-    // Use the first search variant as query
-    const query = expandedProfile.searchVariants[0] ?? `${rawInput.industry} store in ${rawInput.country}`;
-    const fullQuery = `${query} ${rawInput.country}`;
+    const query = keywords[0] ?? "sportswear";
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(fullQuery)}&key=${this.apiKey}`;
+      const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${this.apiKey}`;
       const response = await fetch(url);
       const data = await response.json();
 
       if (!data.results || data.status !== "OK") {
         console.warn(`[GooglePlacesProvider] API returned: ${data.status}`);
-        return this.mockSearch(rawInput, expandedProfile);
+        return this.mockSearch(keywords);
       }
 
       const placeResults = await Promise.allSettled(
@@ -59,22 +51,16 @@ export class GooglePlacesProvider implements DiscoveryProvider {
             return {
               name: detail.name || place.name,
               website: detail.website,
-              description: `${place.name} located at ${place.formatted_address ?? "Unknown"}`,
+              title: detail.name || place.name,
               snippet: place.formatted_address ?? "",
-              country: rawInput.country,
-              source: "google_places",
-              rawPayload: { place, detail },
-            } as DiscoveredCompanyInput;
+            } as DiscoveredCompany;
           } catch {
             return {
               name: place.name,
               website: undefined,
-              description: `${place.name} — ${place.formatted_address ?? ""}`,
+              title: place.name,
               snippet: place.formatted_address ?? "",
-              country: rawInput.country,
-              source: "google_places",
-              rawPayload: { place },
-            } as DiscoveredCompanyInput;
+            } as DiscoveredCompany;
           }
         })
       );
@@ -86,7 +72,7 @@ export class GooglePlacesProvider implements DiscoveryProvider {
       }
     } catch (err) {
       console.error("[GooglePlacesProvider] API call failed:", err);
-      return this.mockSearch(rawInput, expandedProfile);
+      return this.mockSearch(keywords);
     }
 
     return results;
@@ -100,30 +86,35 @@ export class GooglePlacesProvider implements DiscoveryProvider {
     }
   }
 
-  private mockSearch(
-    rawInput: IcpRawInput,
-    expandedProfile: IcpExpansionResult
-  ): DiscoveredCompanyInput[] {
+  private mockSearch(keywords: string[]): DiscoveredCompany[] {
     const brands = [
       { name: "Atlas", suffix: "Sports" },
       { name: "Century", suffix: "Retail" },
       { name: "Horizon", suffix: "Collective" },
       { name: "Vanguard", suffix: "Outpost" },
       { name: "Cascade", suffix: "Trading" },
+      { name: "Summit", suffix: "Boutique" },
+      { name: "Apex", suffix: "Outdoors" },
+      { name: "Summit Peak", suffix: "Outfitters" },
+      { name: "Velo & Trail", suffix: "Collective" },
+      { name: "Latitude", suffix: "Lifestyle" },
+      { name: "Solstice", suffix: "Active" },
+      { name: "Pinnacle", suffix: "Exchange" },
     ];
 
-    return brands.map((b, i) => {
-      const compName = `${b.name} ${rawInput.industry} ${b.suffix}`;
-      const domain = compName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
+    const keywordText = keywords[0] ?? "sportswear";
+    const randomSuffix = Math.floor(Math.random() * 900) + 100;
+
+    return brands.map((b) => {
+      const compName = `${b.name} ${b.suffix} ${randomSuffix}`;
+      const domain = `${b.name.toLowerCase().replace(/[^a-z0-9]/g, "")}${b.suffix.toLowerCase().replace(/[^a-z0-9]/g, "")}${randomSuffix}.com`;
       return {
         name: compName,
         website: `https://${domain}`,
-        description: `${compName} is a premium ${rawInput.industry} retailer in ${rawInput.country}.`,
-        snippet: `Top-rated ${rawInput.industry} store in ${rawInput.country}. Wholesale inquiries welcome.`,
-        country: rawInput.country,
-        source: "google_places_mock",
-        rawPayload: { mock: true, index: i },
+        title: compName,
+        snippet: `Top-rated store matching query: ${keywordText}. Wholesale inquiries welcome.`,
       };
     });
   }
 }
+

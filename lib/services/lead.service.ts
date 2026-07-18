@@ -71,32 +71,22 @@ export class LeadService {
       }
     }
 
-    // Offline / Memory fallback
-    if (companies.length === 0) {
+    // Offline / Memory fallback — only when DB is completely offline
+    if (!isDbLive) {
       if (filters.similarTo) {
-        companies = MemoryStore.findSimilarCompanies(filters.similarTo, limit).map(c => {
-          const scores = MemoryStore.getScores(c.id);
-          const signals = MemoryStore.getSignals(c.id);
-          const outreach = MemoryStore.getOutreach(c.id);
-          return {
-            ...c,
-            scores,
-            signals,
-            outreach,
-          };
-        });
+        companies = MemoryStore.findSimilarCompanies(filters.similarTo, limit).map(c => ({
+          ...c,
+          scores: MemoryStore.getScores(c.id),
+          signals: MemoryStore.getSignals(c.id),
+          outreach: MemoryStore.getOutreach(c.id),
+        }));
       } else {
-        companies = MemoryStore.getCompanies().map(c => {
-          const scores = MemoryStore.getScores(c.id);
-          const signals = MemoryStore.getSignals(c.id);
-          const outreach = MemoryStore.getOutreach(c.id);
-          return {
-            ...c,
-            scores,
-            signals,
-            outreach,
-          };
-        });
+        companies = MemoryStore.getCompanies().map(c => ({
+          ...c,
+          scores: MemoryStore.getScores(c.id),
+          signals: MemoryStore.getSignals(c.id),
+          outreach: MemoryStore.getOutreach(c.id),
+        }));
       }
     }
 
@@ -208,11 +198,12 @@ export class LeadService {
           },
         });
       } catch (err) {
-        console.warn("[LeadService] Live DB fetch company failed, falling back to memory:", err);
+        console.warn("[LeadService] Live DB fetch company failed:", err);
       }
     }
 
-    if (!comp) {
+    // Only fall back to MemoryStore when DB is completely offline
+    if (!comp && !isDbLive) {
       const c = MemoryStore.getCompany(companyId);
       if (c) {
         comp = {

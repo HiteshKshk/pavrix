@@ -1,8 +1,10 @@
 import { checkDbConnection } from "../db/connection";
 import { prisma } from "../db/prisma";
 import { MemoryStore } from "../db/memory-store";
+import { MemoryCache } from "../db/memory-cache";
 import { DiscoveryEngine, DiscoveredLead } from "../discovery.engine";
 import { DiscoveryProviderFactory } from "../discovery/provider.factory";
+import { DiscoveredCompany } from "../discovery/provider.interface";
 import { SignalEngine } from "../signal.engine";
 import { ScoringEngine } from "../scoring.engine";
 import { AIService } from "./ai.service";
@@ -80,6 +82,10 @@ export class PipelineService {
         console.error("[Pipeline] ICP expansion failed:", err);
         // Fallback: minimal expansion
         expandedProfile = {
+          expandedBuyerProfile: `Fallback profile for ${rawInput.industry} in ${rawInput.country}`,
+          searchKeywords: [`${rawInput.industry} ${rawInput.country}`],
+          industryKeywords: [rawInput.industry],
+          alternativePhrases: [rawInput.industry],
           targetCompanies: [`${rawInput.industry} retailers in ${rawInput.country}`],
           exclude: ["manufacturers", "factories"],
           reasoning: "Fallback expansion — LLM unavailable.",
@@ -113,16 +119,101 @@ export class PipelineService {
       };
 
       const discoveryProvider = DiscoveryProviderFactory.getProvider(discoveryProviderType);
-      let discoveredCompanies = await discoveryProvider.search(rawInput, expandedProfile);
+      const keywords = expandedProfile.searchKeywords ?? expandedProfile.searchVariants ?? [
+        `${rawInput.industry} in ${rawInput.country}`
+      ];
+
+      const ttlDays = parseInt(process.env.SEARCH_CACHE_TTL_DAYS ?? "30", 10);
+      const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
+
+      const discoveredCompanies: DiscoveredCompany[] = [];
+      const isDbLive = await checkDbConnection();
+
+      for (const keyword of keywords) {
+        if (!keyword.trim()) continue;
+        let cachedResults: DiscoveredCompany[] | null = null;
+        const cleanKw = keyword.toLowerCase().trim();
+
+        // 1. Check cache
+        if (isDbLive) {
+          try {
+            const entry = await prisma.searchKeyword.findUnique({
+              where: { keyword: cleanKw }
+            });
+            if (entry) {
+              const age = Date.now() - new Date(entry.updatedAt).getTime();
+              if (age < ttlMs) {
+                cachedResults = entry.results as unknown as DiscoveredCompany[];
+                console.info(`[Pipeline] Cache HIT for keyword: "${keyword}"`);
+              }
+            }
+          } catch (e) {
+            console.error(`[Pipeline] Cache query failed for "${keyword}":`, e);
+          }
+        } else {
+          const entry = MemoryCache.getSearchKeyword(cleanKw);
+          if (entry) {
+            const age = Date.now() - new Date(entry.updatedAt).getTime();
+            if (age < ttlMs) {
+              cachedResults = entry.results as unknown as DiscoveredCompany[];
+              console.info(`[Pipeline] Memory Cache HIT for keyword: "${keyword}"`);
+            }
+          }
+        }
+
+        // 2. Fetch from provider if missing or stale
+        if (cachedResults) {
+          discoveredCompanies.push(...cachedResults);
+        } else {
+          console.info(`[Pipeline] Cache MISS for keyword: "${keyword}". Fetching from provider.`);
+          try {
+            const freshResults = await discoveryProvider.search([keyword]);
+            discoveredCompanies.push(...freshResults);
+
+            // Save to cache
+            if (isDbLive) {
+              try {
+                await prisma.searchKeyword.upsert({
+                  where: { keyword: cleanKw },
+                  create: {
+                    keyword: cleanKw,
+                    results: freshResults as any,
+                  },
+                  update: {
+                    results: freshResults as any,
+                    updatedAt: new Date(),
+                  }
+                });
+              } catch (e) {
+                console.error(`[Pipeline] Failed to save search cache for "${keyword}":`, e);
+              }
+            } else {
+              MemoryCache.setSearchKeyword(keyword, freshResults);
+            }
+          } catch (e) {
+            console.error(`[Pipeline] Provider search failed for "${keyword}":`, e);
+          }
+        }
+      }
+
+      // Deduplicate by root domain within the batch
+      const seenBatchDomains = new Set<string>();
+      const batchDeduplicated = discoveredCompanies.filter((dc) => {
+        if (!dc.website) return true;
+        const domain = CompanyRepository.extractDomain(dc.website);
+        if (!domain) return true;
+        if (seenBatchDomains.has(domain)) return false;
+        seenBatchDomains.add(domain);
+        return true;
+      });
 
       yield {
         stage: "searching",
-        message: `Found ${discoveredCompanies.length} candidate companies`,
+        message: `Found ${batchDeduplicated.length} candidate companies after batch domain deduplication`,
         pct: 35,
       };
 
       // ── Stage 3: Deduplication ────────────────────────────────────────────
-      const isDbLive = await checkDbConnection();
       let allCompanies: any[] = [];
 
       if (isDbLive) {
@@ -134,7 +225,7 @@ export class PipelineService {
         allCompanies = MemoryStore.getCompanies();
       }
 
-      const uniqueCompanies = discoveredCompanies.filter((dc) => {
+      const uniqueCompanies = batchDeduplicated.filter((dc) => {
         const asLead: DiscoveredLead = {
           name: dc.name,
           address: rawInput.country,
@@ -147,7 +238,7 @@ export class PipelineService {
 
       yield {
         stage: "searching",
-        message: `${uniqueCompanies.length} unique (${discoveredCompanies.length - uniqueCompanies.length} duplicates removed)`,
+        message: `${uniqueCompanies.length} unique (${batchDeduplicated.length - uniqueCompanies.length} duplicates removed against DB)`,
         pct: 40,
       };
 
@@ -211,8 +302,12 @@ export class PipelineService {
           phone: crawl?.phone ?? undefined,
           hasEcommerce: crawl?.hasEcommerce ?? false,
           storeCount: crawl?.storeCount ?? undefined,
-          mockWebsiteContent: crawl?.aboutText ?? dc.description ?? dc.snippet ?? "",
+          mockWebsiteContent: crawl?.aboutText ?? (dc as any).description ?? dc.snippet ?? "",
         };
+
+        // Run AI Company Analysis
+        const analysis = await AIService.analyzeCompany(lead.mockWebsiteContent || "", rawInput);
+        const compStatus = analysis.status === "analysis_failed" ? "analysis_failed" : "New";
 
         // Save company
         const savedComp = await CompanyRepository.create({
@@ -227,8 +322,28 @@ export class PipelineService {
           hasEcommerce: lead.hasEcommerce,
           crawlData: crawl ?? null,
           crawledAt: crawl ? new Date() : undefined,
-          status: "New",
+          status: compStatus as any,
+          description: analysis.companySummary,
         });
+
+        // Save structured WebsiteContent
+        if (crawl && !crawl.error) {
+          if (isDbLive) {
+            try {
+              await prisma.websiteContent.create({
+                data: {
+                  companyId: savedComp.id,
+                  url: dc.website ?? "",
+                  content: crawl.aboutText,
+                }
+              });
+            } catch (e) {
+              console.error("[Pipeline] Failed to save WebsiteContent:", e);
+            }
+          } else {
+            MemoryCache.addWebsiteContent(savedComp.id, dc.website ?? "", crawl.aboutText);
+          }
+        }
 
         // Detect signals
         const detected = SignalEngine.detectSignals(
@@ -249,6 +364,8 @@ export class PipelineService {
                   detectedDate: new Date(),
                   pointValue: sig.pointValue,
                   description: sig.description,
+                  sourceField: sig.sourceField,
+                  matchedText: sig.matchedText,
                 },
               });
             } catch {}
@@ -260,6 +377,8 @@ export class PipelineService {
               detectedDate: new Date().toISOString(),
               pointValue: sig.pointValue,
               description: sig.description,
+              sourceField: sig.sourceField,
+              matchedText: sig.matchedText,
             });
           }
           savedSignals.push(savedSig);
@@ -273,7 +392,8 @@ export class PipelineService {
           brandKeywords,
           catObj.weightTemplate as any,
           lead.mockWebsiteContent,
-          rawInput.keywords
+          rawInput.keywords,
+          analysis.confidenceScore
         );
 
         // Save score
@@ -299,7 +419,7 @@ export class PipelineService {
           });
         }
 
-        const isQualified = scoreRes.totalScore >= 60;
+        const isQualified = scoreRes.totalScore >= 40;
         rank++;
 
         await SearchRepository.linkCompany(searchId, savedComp.id, rank, isQualified);
@@ -541,7 +661,7 @@ export class PipelineService {
         }
       }
 
-      const isQualified = bestScore >= 60;
+      const isQualified = bestScore >= 40;
       if (isQualified) {
         const embedding = await AIService.generateEmbedding(
           `${lead.name} ${lead.address} ${lead.mockWebsiteContent ?? ""}`
