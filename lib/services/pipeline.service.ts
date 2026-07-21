@@ -6,7 +6,7 @@ import { DiscoveryEngine, DiscoveredLead } from "../discovery.engine";
 import { DiscoveryProviderFactory } from "../discovery/provider.factory";
 import { DiscoveredCompany } from "../discovery/provider.interface";
 import { SignalEngine } from "../signal.engine";
-import { ScoringEngine } from "../scoring.engine";
+import { ScoringEngine, normalizeCategory } from "../scoring.engine";
 import { AIService } from "./ai.service";
 import { PlaywrightCrawler } from "../crawl/crawler";
 import { CompanyRepository } from "../repositories/company.repository";
@@ -225,7 +225,10 @@ export class PipelineService {
         allCompanies = MemoryStore.getCompanies();
       }
 
-      const uniqueCompanies = batchDeduplicated.filter((dc) => {
+      const uniqueCompanies: DiscoveredCompany[] = [];
+      const duplicateIds: string[] = [];
+
+      for (const dc of batchDeduplicated) {
         const asLead: DiscoveredLead = {
           name: dc.name,
           address: rawInput.country,
@@ -233,12 +236,58 @@ export class PipelineService {
           website: dc.website,
           hasEcommerce: false,
         };
-        return !DiscoveryEngine.syncCheckDuplicate(asLead, allCompanies);
-      });
+
+        const existingMatch = allCompanies.find((existing) => {
+          const domain = DiscoveryEngine.normalizeDomain(asLead.website);
+          const phone = DiscoveryEngine.normalizePhone(asLead.phone);
+          const address = asLead.address;
+          if (domain && existing.website) {
+            const existingDomain = DiscoveryEngine.normalizeDomain(existing.website);
+            if (domain === existingDomain) return true;
+          }
+          if (phone && existing.phone) {
+            const existingPhone = DiscoveryEngine.normalizePhone(existing.phone);
+            if (phone === existingPhone) return true;
+          }
+          if (address && existing.address) {
+            const similarity = DiscoveryEngine.addressSimilarity(address, existing.address);
+            if (similarity >= 0.70) return true;
+          }
+          return false;
+        });
+
+        if (existingMatch) {
+          duplicateIds.push(existingMatch.id);
+        } else {
+          uniqueCompanies.push(dc);
+        }
+      }
+
+      // Fetch full duplicate company records with scores and signals
+      let fullDuplicates: any[] = [];
+      if (duplicateIds.length > 0) {
+        if (isDbLive) {
+          try {
+            fullDuplicates = await prisma.company.findMany({
+              where: { id: { in: duplicateIds } },
+              include: { scores: true, signals: true }
+            });
+          } catch {}
+        } else {
+          fullDuplicates = duplicateIds.map(id => {
+            const c = MemoryStore.getCompany(id);
+            return c ? {
+              ...c,
+              scores: MemoryStore.getScores(id),
+              signals: MemoryStore.getSignals(id)
+            } : null;
+          }).filter(Boolean);
+        }
+      }
 
       yield {
         stage: "searching",
-        message: `${uniqueCompanies.length} unique (${batchDeduplicated.length - uniqueCompanies.length} duplicates removed against DB)`,
+        message: `${uniqueCompanies.length} unique (${duplicateIds.length} duplicates recognized against DB)`,
         pct: 40,
       };
 
@@ -253,8 +302,9 @@ export class PipelineService {
         ? await prisma.category.findMany().catch(() => [])
         : MemoryStore.getCategories();
 
+      const normQueryCat = normalizeCategory(rawInput.industry);
       const catObj = allCategories.find(
-        (c) => c.name.toLowerCase() === rawInput.industry.toLowerCase()
+        (c) => c.name.toLowerCase() === normQueryCat
       ) ?? { brandKeywords: [] };
       const brandKeywords = (catObj.brandKeywords as string[]) ?? [];
 
@@ -310,11 +360,12 @@ export class PipelineService {
         const compStatus = analysis.status === "analysis_failed" ? "analysis_failed" : "New";
 
         // Save company
+        const finalIndustry = normalizeCategory(analysis.industry || rawInput.industry);
         const savedComp = await CompanyRepository.create({
           name: lead.name,
           address: lead.address,
           country: rawInput.country,
-          categoryTags: lead.categoryTags,
+          categoryTags: [finalIndustry],
           website: lead.website,
           phone: lead.phone,
           source: "outbound",
@@ -393,7 +444,8 @@ export class PipelineService {
           catObj.weightTemplate as any,
           lead.mockWebsiteContent,
           rawInput.keywords,
-          analysis.confidenceScore
+          analysis.confidenceScore,
+          analysis.icpMatch
         );
 
         // Save score
@@ -501,6 +553,71 @@ export class PipelineService {
           name: lead.name,
           isDuplicate: false,
           score: scoreRes.totalScore,
+          qualified: isQualified,
+          dbWarning: isDbLive ? undefined : "Running in Simulated Data Mode (in-memory)",
+        });
+      }
+
+      // Process and link duplicate/existing companies
+      for (const comp of fullDuplicates) {
+        // Check if there is an existing score for this category
+        let totalScore = 0;
+        let scoreRecord = comp.scores?.find(
+          (s: any) => s.categoryName.toLowerCase() === rawInput.industry.toLowerCase()
+        );
+
+        if (scoreRecord) {
+          totalScore = scoreRecord.totalScore;
+        } else {
+          // Compute a new score for the target category
+          const scoreRes = ScoringEngine.computeScore(
+            comp,
+            comp.signals || [],
+            rawInput.industry,
+            brandKeywords,
+            catObj.weightTemplate as any,
+            comp.description || "",
+            rawInput.keywords,
+            80, // confidence fallback
+            true // icpMatch fallback
+          );
+          totalScore = scoreRes.totalScore;
+
+          // Save the computed score for the category
+          if (isDbLive) {
+            try {
+              await prisma.score.create({
+                data: {
+                  companyId: comp.id,
+                  categoryName: rawInput.industry,
+                  totalScore: scoreRes.totalScore,
+                  breakdown: scoreRes.breakdown as any,
+                  scoreVersion: scoreRes.scoreVersion,
+                },
+              });
+            } catch {}
+          } else {
+            MemoryStore.addScore({
+              companyId: comp.id,
+              categoryName: rawInput.industry,
+              totalScore: scoreRes.totalScore,
+              breakdown: scoreRes.breakdown,
+              scoreVersion: scoreRes.scoreVersion,
+            });
+          }
+        }
+
+        const isQualified = totalScore >= 40;
+        rank++;
+
+        // Link existing company to this search
+        await SearchRepository.linkCompany(searchId, comp.id, rank, isQualified);
+
+        results.push({
+          companyId: comp.id,
+          name: comp.name,
+          isDuplicate: true,
+          score: totalScore,
           qualified: isQualified,
           dbWarning: isDbLive ? undefined : "Running in Simulated Data Mode (in-memory)",
         });

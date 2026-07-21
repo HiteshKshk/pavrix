@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   // Log request for monitoring
-  console.log(`[Middleware] ${request.method} ${request.nextUrl.pathname}`);
+  console.log(`[Proxy] ${request.method} ${request.nextUrl.pathname}`);
   
   // Forward header for rate limiting support
   const requestHeaders = new Headers(request.headers);

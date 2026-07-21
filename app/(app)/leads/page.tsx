@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Search, Filter, Download, ChevronRight, ExternalLink,
@@ -9,9 +9,24 @@ import {
 } from "lucide-react";
 import { ScoreBadge, StatusBadge, SignalBadge } from "@/components/ui/Badge";
 import { StatusSelect } from "@/components/ui/StatusSelect";
+import { normalizeCategory } from "@/lib/scoring.engine";
 
 const SCORE_BANDS = ["All", "Hot", "Warm", "Nurture", "Deprioritize"];
 const STATUS_VALUES = ["All", "New", "Qualified", "Contacted", "Meeting", "Won", "Lost", "Archive"];
+const CATEGORIES = [
+  "All",
+  "sportswear",
+  "footwear",
+  "luxury",
+  "outdoor",
+  "kitchen",
+  "toys",
+  "fashion",
+  "beauty",
+  "accessories",
+  "electronics",
+  "home",
+];
 
 const COLUMNS = [
   { status: "New", label: "New", bg: "bg-blue-500/5", border: "border-blue-500/20", text: "text-blue-400" },
@@ -23,23 +38,44 @@ const COLUMNS = [
 ];
 
 export default function LeadsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+        </div>
+      }
+    >
+      <LeadsContent />
+    </Suspense>
+  );
+}
+
+function LeadsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialCategory = searchParams.get("category")
+    ? normalizeCategory(searchParams.get("category")!)
+    : "All";
+
   const [search, setSearch] = useState("");
   const [band, setBand] = useState("All");
   const [status, setStatus] = useState("All");
   const [source, setSource] = useState("All");
+  const [category, setCategory] = useState(initialCategory);
   const [showFilters, setShowFilters] = useState(false);
   const [viewType, setViewType] = useState<"table" | "pipeline">("table");
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["leads", { search, band, status, source }],
+    queryKey: ["leads", { search, band, status, source, category }],
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
       if (band !== "All") qs.set("band", band);
       if (status !== "All") qs.set("status", status);
       if (source !== "All") qs.set("source", source);
+      if (category !== "All") qs.set("category", category);
       qs.set("limit", "100");
       const res = await fetch(`/api/leads?${qs.toString()}`);
       return res.json();
@@ -207,6 +243,26 @@ export default function LeadsPage() {
                     {s}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div className="space-y-1.5 min-w-[160px]">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                Category
+              </label>
+              <div>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="rounded-lg border border-border bg-card/60 px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/30 focus:outline-none focus:border-primary/50 transition-all cursor-pointer capitalize"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c} className="bg-background text-foreground capitalize">
+                      {c === "All" ? "All Categories" : c}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

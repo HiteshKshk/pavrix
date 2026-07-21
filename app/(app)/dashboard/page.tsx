@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const [pipelineMsg, setPipelineMsg] = useState("");
   const [pipelinePct, setPipelinePct] = useState(0);
   const [pipelineError, setPipelineError] = useState("");
+  const [searchedCategory, setSearchedCategory] = useState<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   const { data, isLoading, refetch } = useQuery<{ data: DashboardData }>({
@@ -66,6 +67,7 @@ export default function DashboardPage() {
     setPipelineStage("building_icp");
     setPipelinePct(0);
     setPipelineError("");
+    setSearchedCategory(params.targetCustomer);
 
     // Build SSE URL
     const qs = new URLSearchParams({
@@ -185,7 +187,12 @@ export default function DashboardPage() {
               </div>
               <div className="flex gap-3 justify-center">
                 <button
-                  onClick={() => router.push("/leads")}
+                  onClick={() => {
+                    const url = searchedCategory
+                      ? `/leads?category=${encodeURIComponent(searchedCategory)}`
+                      : "/leads";
+                    router.push(url);
+                  }}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all"
                 >
                   View All Leads

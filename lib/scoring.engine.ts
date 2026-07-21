@@ -21,6 +21,45 @@ export interface ScoringResult {
   scoreVersion: string;
 }
 
+/** Normalizes raw industry inputs and names to canonical category names */
+export function normalizeCategory(name: string): string {
+  const clean = name.toLowerCase().trim();
+  if (clean.includes("sport") || clean.includes("athletic") || clean.includes("gym")) {
+    return "sportswear";
+  }
+  if (clean.includes("footwear") || clean.includes("shoe")) {
+    return "footwear";
+  }
+  if (clean.includes("luxury") || clean.includes("boutique")) {
+    return "luxury";
+  }
+  if (clean.includes("outdoor") || clean.includes("hiking") || clean.includes("trail") || clean.includes("climbing")) {
+    return "outdoor";
+  }
+  if (clean.includes("kitchen") || clean.includes("appliance")) {
+    return "kitchen";
+  }
+  if (clean.includes("toy") || clean.includes("game")) {
+    return "toys";
+  }
+  if (clean.includes("fashion") || clean.includes("clothing") || clean.includes("apparel") || clean.includes("wear")) {
+    return "fashion";
+  }
+  if (clean.includes("beauty") || clean.includes("cosmetic") || clean.includes("skincare") || clean.includes("makeup")) {
+    return "beauty";
+  }
+  if (clean.includes("accessories") || clean.includes("handbag") || clean.includes("bag")) {
+    return "accessories";
+  }
+  if (clean.includes("electronic") || clean.includes("gadget") || clean.includes("phone") || clean.includes("computer")) {
+    return "electronics";
+  }
+  if (clean.includes("home") || clean.includes("furniture")) {
+    return "home";
+  }
+  return clean;
+}
+
 /** Centralized scoring weights configuration object. Can be tuned here in one place. */
 export const DEFAULT_WEIGHTS: WeightTemplate = {
   industryMatch: 0.20,
@@ -81,7 +120,8 @@ export class ScoringEngine {
     weightTemplate?: Partial<WeightTemplate>,
     websiteText?: string,
     targetBrands?: string[],
-    aiConfidenceScore?: number
+    aiConfidenceScore?: number,
+    icpMatch?: boolean
   ): ScoringResult {
     const template: WeightTemplate = {
       ...DEFAULT_WEIGHTS,
@@ -98,16 +138,16 @@ export class ScoringEngine {
     }
 
     const breakdown: Record<string, ScoreBreakdownItem> = {};
-    const catNameLower = categoryName.toLowerCase();
-    const companyCatsLower = company.categoryTags.map((c) => c.toLowerCase());
+    const normCategoryName = normalizeCategory(categoryName);
+    const normCompanyCats = company.categoryTags.map((c) => normalizeCategory(c));
 
     // 1. Industry Match
     let industryMatchRaw = 0;
-    if (companyCatsLower.includes(catNameLower)) {
+    if (normCompanyCats.includes(normCategoryName)) {
       industryMatchRaw = 100;
     } else {
-      const adjacents = ADJACENT_CATEGORIES[catNameLower] ?? [];
-      if (companyCatsLower.some((c) => adjacents.includes(c))) {
+      const adjacents = ADJACENT_CATEGORIES[normCategoryName] ?? [];
+      if (normCompanyCats.some((c) => adjacents.includes(c))) {
         industryMatchRaw = 50;
       }
     }
@@ -226,6 +266,10 @@ export class ScoringEngine {
       totalScore += breakdown[key].contribution;
     }
     totalScore = Math.round(totalScore);
+
+    if (icpMatch === false) {
+      totalScore = Math.min(totalScore, 25);
+    }
 
     let band: ScoringResult["band"] = "Deprioritize";
     if (totalScore >= 80) band = "Hot";
